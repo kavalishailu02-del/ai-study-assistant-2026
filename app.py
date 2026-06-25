@@ -1,27 +1,25 @@
 import streamlit as st
 import requests
 from pypdf import PdfReader
+from google import genai
 
 st.set_page_config(page_title="AI Study Assistant")
 
 st.title("📚 AI Study Assistant")
 
-# ---------------------------
+# -----------------------------
 # MODE SELECTION
-# ---------------------------
-mode = st.radio(
-    "Choose AI Mode",
-    ["Local (Ollama)", "Cloud (BYOK)"]
-)
+# -----------------------------
+mode = st.radio("Choose AI Mode", ["Local (Ollama)", "Cloud (Gemini)"])
 
-# ---------------------------
-# LANGUAGE (simple demo)
-# ---------------------------
+# -----------------------------
+# LANGUAGE SELECTION
+# -----------------------------
 lang = st.selectbox("Language", ["English", "Hindi", "Telugu"])
 
-# ---------------------------
+# -----------------------------
 # PDF UPLOAD
-# ---------------------------
+# -----------------------------
 uploaded_file = st.file_uploader("Upload PDF", type=["pdf"])
 
 pdf_text = ""
@@ -35,29 +33,31 @@ if uploaded_file:
 
     st.success("PDF Loaded Successfully")
 
-# ---------------------------
+# -----------------------------
 # QUESTION INPUT
-# ---------------------------
+# -----------------------------
 question = st.text_input("Ask your question")
 
-# ---------------------------
-# RESPONSE LOGIC
-# ---------------------------
+# -----------------------------
+# GENERATE BUTTON
+# -----------------------------
 if st.button("Ask") and question:
 
     final_prompt = f"""
-    Language: {lang}
+Language: {lang}
 
-    Use this study material:
-    {pdf_text}
+Use this study material:
+{pdf_text}
 
-    Question:
-    {question}
-    """
+Question:
+{question}
 
-    # ---------------------------
+Give a simple student-friendly answer.
+"""
+
+    # -------------------------
     # LOCAL MODE (OLLAMA)
-    # ---------------------------
+    # -------------------------
     if mode == "Local (Ollama)":
 
         try:
@@ -67,44 +67,44 @@ if st.button("Ask") and question:
                     "model": "llama3:latest",
                     "prompt": final_prompt,
                     "stream": False
-                }
-            )
-
-            answer = response.json()["response"]
-            st.subheader("Answer")
-            st.write(answer)
-
-        except Exception:
-            st.error("❌ Local Ollama not available. Run on your laptop.")
-
-    # ---------------------------
-    # CLOUD MODE (BYOK)
-    # ---------------------------
-    else:
-        api_key = st.text_input("Enter OpenAI API Key", type="password")
-
-        if api_key:
-
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
-
-            data = {
-                "model": "gpt-4o-mini",
-                "messages": [
-                    {"role": "user", "content": final_prompt}
-                ]
-            }
-
-            response = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers=headers,
-                json=data
+                },
+                timeout=120
             )
 
             result = response.json()
-            answer = result["choices"][0]["message"]["content"]
 
-            st.subheader("Answer")
-            st.write(answer)
+            if "response" in result:
+                st.subheader("Answer")
+                st.write(result["response"])
+            else:
+                st.error("Invalid Ollama response")
+                st.json(result)
+
+        except Exception as e:
+            st.error(f"Ollama Error: {e}")
+
+    # -------------------------
+    # CLOUD MODE (GEMINI)
+    # -------------------------
+    else:
+
+        api_key = st.text_input("Enter Gemini API Key", type="password")
+
+        if api_key:
+
+            try:
+                from google import genai
+
+            client = genai.Client(api_key=api_key)
+
+            response = client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=final_prompt
+            )
+
+                st.subheader("Answer")
+                st.write(response.text)
+
+            except Exception as e:
+                st.error(f"Gemini Error: {e}")
+
